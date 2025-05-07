@@ -13,6 +13,11 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 
 @RestController
@@ -86,5 +91,76 @@ public class ItemController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error creating item", e);
         }
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Item> getItemById(@PathVariable Long id) {
+        try {
+            return itemService.findById(id)
+                    .map(item -> {
+                        logger.debug("Found item with ID: {}", id);
+                        return new ResponseEntity<>(item, HttpStatus.OK);
+                    })
+                    .orElseGet(() -> {
+                        logger.debug("Item with ID {} not found", id);
+                        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+                    });
+        } catch (Exception e) {
+            logger.error("Error retrieving item with ID: {}", id, e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error retrieving item", e);
+        }
+    }
+     //@param result Validation result from Spring's validation framework
+     //@return ResponseEntity with the updated item (HTTP 200), validation errors (HTTP 400),or HTTP 404 if not found
+     //@throws ResponseStatusException with 500 status if an error occurs
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateItem(@PathVariable Long id, @Valid @RequestBody Item item, BindingResult result) {
+        if (result.hasErrors()) {
+            Map<String, String> errors = new HashMap<>();
+            for (FieldError error : result.getFieldErrors()) {
+                errors.put(error.getField(), error.getDefaultMessage());
+            }
+            logger.warn("Validation errors when updating item {}: {}", id, errors);
+            return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+        }
+
+        Map<String, String> errors = new HashMap<>();
+        boolean hasErrors = false;
+
+        // vlidate email format
+        if (item.getEmail() != null && !item.getEmail().matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
+            errors.put("email", "Email must be in a valid format");
+            hasErrors = true;
+            logger.warn("Email validation failed for: {}", item.getEmail());
+        }
+
+        //validate status values
+        if (item.getStatus() != null && !item.getStatus().matches("^(NEW|IN_PROGRESS|PROCESSED|COMPLETED)$")) {
+            errors.put("status", "Status must be one of: NEW, IN_PROGRESS, PROCESSED, COMPLETED");
+            hasErrors = true;
+            logger.warn("Status validation failed for: {}", item.getStatus());
+        }
+
+        if (hasErrors) {
+            return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            Optional<Item> existingItem = itemService.findById(id);
+            if (existingItem.isPresent()) {
+                item.setId(id);
+                Item updatedItem = itemService.save(item);
+                logger.info("Updated item with ID: {}", id);
+                return new ResponseEntity<>(updatedItem, HttpStatus.OK);
+            } else {
+                logger.debug("Item with ID {} not found for update", id);
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            logger.error("Error updating item with ID: {}", id, e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error updating item", e);
+        }
+    }
+
 
 }
