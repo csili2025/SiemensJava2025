@@ -63,5 +63,78 @@ public class ItemService {
      //3 Saving the updated item back to the database
 
      //@return CompletableFuture containing a list of all successfully processed items
+    @Async
+    public CompletableFuture<List<Item>> processItemsAsync() {
+        logger.info("Starting async processing of items");
 
+        try {
+            List<Long> itemIds = itemRepository.findAllIds();
+            logger.info("Found {} items to process", itemIds.size());
+
+            if (itemIds.isEmpty()) {
+                return CompletableFuture.completedFuture(new ArrayList<>());
+            }
+
+            List<CompletableFuture<Item>> futures = itemIds.stream()
+                    .map(id -> CompletableFuture.supplyAsync(() -> processItem(id), executor))
+                    .toList();
+            CompletableFuture<Void> allFutures = CompletableFuture.allOf(
+                    futures.toArray(new CompletableFuture[0]));
+
+            return allFutures.thenApply(v ->
+                    futures.stream()
+                            .map(future -> {
+                                try {
+                                    return future.join(); // Safe after allOf completes
+                                } catch (CompletionException e) {
+                                    logger.error("Error retrieving future result", e.getCause());
+                                    return null;
+                                }
+                            })
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList())
+            );
+        } catch (Exception e) {
+            logger.error("Failed to initiate item processing", e);
+            CompletableFuture<List<Item>> failedFuture = new CompletableFuture<>();
+            failedFuture.completeExceptionally(
+                    new RuntimeException("Failed to process items", e));
+            return failedFuture;
+        }
+    }
+
+    //@param id ID of the item to process
+    //@return The processed item if successful, null otherwise
+
+    private Item processItem(Long id) {
+        try {
+            logger.debug("Processing item with ID: {}", id);
+
+            // Simulate some processing work
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Processing interrupted", e);
+            }
+
+            // Find the item
+            Optional<Item> optionalItem = itemRepository.findById(id);
+            if (optionalItem.isEmpty()) {
+                logger.warn("Item with ID {} not found during processing", id);
+                return null;
+            }
+
+            // Update and save the item
+            Item item = optionalItem.get();
+            item.setStatus("PROCESSED");
+            Item savedItem = itemRepository.save(item);
+
+            logger.debug("Successfully processed item with ID: {}", id);
+            return savedItem;
+        } catch (Exception e) {
+            logger.error("Error processing item ID: {}", id, e);
+            return null;
+        }
+    }
 }
