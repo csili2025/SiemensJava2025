@@ -162,5 +162,25 @@ public class ItemController {
         }
     }
 
+     //@param id The ID of the item to delete
+     //@return ResponseEntity with HTTP-204-NO_CONTENT if successful or HTTP-404 if not found
+     //@throws ResponseStatusException with 500-status if an error occurs
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteItem(@PathVariable Long id) {
+        try {
+            if (itemService.findById(id).isPresent()) {
+                itemService.deleteById(id);
+                logger.info("Deleted item with ID: {}", id);
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            } else {
+                logger.debug("Item with ID {} not found for deletion", id);
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        } catch (Exception e) {
+            logger.error("Error deleting item with ID: {}", id, e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error deleting item", e);
+        }
+    }
 
 }
