@@ -182,5 +182,30 @@ public class ItemController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error deleting item", e);
         }
     }
+     //@return ResponseEntity with a list of processed items and HTTP-200 status OK
+     //@throws ResponseStatusException with appropriate status code if errors occur
 
+    @GetMapping("/process")
+    public ResponseEntity<List<Item>> processItems() {
+        try {
+            logger.info("Starting item processing");
+            CompletableFuture<List<Item>> future = itemService.processItemsAsync();
+
+            // Apply timeout to prevent blocking indefinitely
+            List<Item> processedItems = future.get(ASYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+            logger.info("Item processing completed successfully. Processed {} items", processedItems.size());
+            return new ResponseEntity<>(processedItems, HttpStatus.OK);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("Item processing was interrupted", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Processing was interrupted", e);
+        } catch (ExecutionException e) {
+            logger.error("Error occurred during item processing", e.getCause());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error processing items", e.getCause());
+        } catch (TimeoutException e) {
+            logger.error("Item processing timed out after {} seconds", ASYNC_TIMEOUT_SECONDS, e);
+            throw new ResponseStatusException(HttpStatus.REQUEST_TIMEOUT, "Processing timed out", e);
+        }
+    }
 }
