@@ -63,6 +63,68 @@ class ItemControllerUnitTests {
     }
 
     @Test
+    void createItem_WithValidItem_ShouldReturnCreated() {
+        // Arrange
+        when(bindingResult.hasErrors()).thenReturn(false);
+        when(itemService.save(any(Item.class))).thenReturn(testItem);
+
+        // Act
+        ResponseEntity<?> response = itemController.createItem(testItem, bindingResult);
+
+        // Assert
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(testItem, response.getBody());
+        verify(itemService, times(1)).save(testItem);
+    }
+
+    @Test
+    void createItem_WithValidationErrors_ShouldReturnBadRequest() {
+        // Arrange
+        when(bindingResult.hasErrors()).thenReturn(true);
+        FieldError error = new FieldError("item", "email", "Invalid email");
+        when(bindingResult.getFieldErrors()).thenReturn(Collections.singletonList(error));
+
+        // Act
+        ResponseEntity<?> response = itemController.createItem(testItem, bindingResult);
+
+        // Assert
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertInstanceOf(Map.class, response.getBody());
+        Map<String, String> errors = (Map<String, String>) response.getBody();
+        assertEquals("Invalid email", errors.get("email"));
+        verify(itemService, never()).save(any(Item.class));
+    }
+
+    @Test
+    void getItemById_WhenItemExists_ShouldReturnItem() {
+        // Arrange
+        when(itemService.findById(1L)).thenReturn(Optional.of(testItem));
+
+        // Act
+        ResponseEntity<Item> response = itemController.getItemById(1L);
+
+        // Assert
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(testItem, response.getBody());
+        verify(itemService, times(1)
+        ).findById(1L);
+    }
+
+    @Test
+    void getItemById_WhenItemDoesNotExist_ShouldReturnNotFound() {
+        // Arrange
+        when(itemService.findById(99L)).thenReturn(Optional.empty());
+
+        // Act
+        ResponseEntity<Item> response = itemController.getItemById(99L);
+
+        // Assert
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(itemService, times(1)).findById(99L);
+    }
+
+    @Test
     void updateItem_WhenItemExists_ShouldReturnUpdatedItem() {
         // Arrange
         when(bindingResult.hasErrors()).thenReturn(false);
@@ -119,6 +181,19 @@ class ItemControllerUnitTests {
     }
 
     @Test
+    void deleteItem_WhenItemDoesNotExist_ShouldReturnNotFound() {
+        // Arrange
+        when(itemService.findById(99L)).thenReturn(Optional.empty());
+
+        // Act
+        ResponseEntity<Void> response = itemController.deleteItem(99L);
+
+        // Assert
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(itemService, never()).deleteById(anyLong());
+    }
+
+    @Test
     void processItems_ShouldReturnProcessedItems() throws Exception {
         // Arrange
         List<Item> processedItems = Arrays.asList(testItem);
@@ -132,5 +207,40 @@ class ItemControllerUnitTests {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(processedItems, response.getBody());
         verify(itemService, times(1)).processItemsAsync();
+    }
+}
+
+/**
+ * Additional tests for Item entity validation
+ */
+@SpringBootTest
+class ItemValidationTests {
+
+    private Item item;
+
+    @BeforeEach
+    void setUp() {
+        item = new Item();
+        item.setId(1L);
+        item.setName("Valid Name");
+        item.setDescription("Valid Description");
+        item.setStatus("NEW");
+        item.setEmail("valid@example.com");
+    }
+
+    @Test
+    void toStringMethod_ShouldExcludeId() {
+        // Verify toString implementation excludes ID for better logging
+        String itemString = item.toString();
+        assertFalse(itemString.contains("id=1"));
+        assertTrue(itemString.contains("name=Valid Name"));
+    }
+
+    /**
+     * Additional tests for Item repository
+     */
+    @SpringBootTest
+    static class ItemRepositoryIntegrationTests {
+        // Additional repository tests could be added here
     }
 }
