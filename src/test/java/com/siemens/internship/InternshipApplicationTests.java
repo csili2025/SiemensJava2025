@@ -167,4 +167,53 @@ class InternshipApplicationTests {
 		assertTrue(response.getBody().containsKey("email"));
 	}
 
+
+	@Test
+	void testInvalidStatusValidation() {
+		//create an item with invalid status
+		Item invalidItem = new Item();
+		invalidItem.setName("Invalid Status Item");
+		invalidItem.setDescription("Item with invalid status");
+		invalidItem.setStatus("INVALID_STATUS");
+		invalidItem.setEmail("valid@example.com");
+
+		ResponseEntity<Map<String, String>> response = restTemplate.exchange(
+				baseUrl,
+				HttpMethod.POST,
+				new HttpEntity<>(invalidItem),
+				new ParameterizedTypeReference<Map<String, String>>() {}
+		);
+
+		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertTrue(response.getBody().containsKey("status"));
+	}
+
+
+	@Test
+	void testNonExistentItemHandling() {
+		//get a non-existent item
+		ResponseEntity<Object> getResponse = restTemplate.getForEntity(
+				baseUrl + "/99999", Object.class);
+		assertEquals(HttpStatus.NOT_FOUND, getResponse.getStatusCode());
+
+		//update a non-existent item
+		Item item = new Item();
+		item.setName("Non-existent Item");
+		item.setDescription("This item doesn't exist");
+		item.setStatus("NEW");
+		item.setEmail("nonexistent@example.com");
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		HttpEntity<Item> requestEntity = new HttpEntity<>(item, headers);
+
+		ResponseEntity<Object> updateResponse = restTemplate.exchange(
+				baseUrl + "/99999", HttpMethod.PUT, requestEntity, Object.class);
+		assertEquals(HttpStatus.NOT_FOUND, updateResponse.getStatusCode());
+
+		ResponseEntity<Object> deleteResponse = restTemplate.exchange(
+				baseUrl + "/99999", HttpMethod.DELETE, null, Object.class);
+		assertEquals(HttpStatus.NOT_FOUND, deleteResponse.getStatusCode());
+	}
 }
