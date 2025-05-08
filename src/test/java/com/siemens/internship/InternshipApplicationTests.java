@@ -139,4 +139,32 @@ class InternshipApplicationTests {
 		}
 	}
 
+	@Test
+	void testInvalidEmailValidation() {
+		//verify that Hibernate Validator is on the classpath
+		try {
+			Class.forName("jakarta.validation.Validator");
+		} catch (ClassNotFoundException e) {
+			System.out.println("Skipping email validation test - Validator not found");
+			return;
+		}
+
+		Item invalidItem = new Item();
+		invalidItem.setName("Invalid Email Item");
+		invalidItem.setDescription("Item with invalid email");
+		invalidItem.setStatus("NEW");
+		invalidItem.setEmail("not-a-valid-email");
+
+		ResponseEntity<Map<String, String>> response = restTemplate.exchange(
+				baseUrl,
+				HttpMethod.POST,
+				new HttpEntity<>(invalidItem),
+				new ParameterizedTypeReference<Map<String, String>>() {}
+		);
+
+		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertTrue(response.getBody().containsKey("email"));
+	}
+
 }
