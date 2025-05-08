@@ -216,4 +216,48 @@ class InternshipApplicationTests {
 				baseUrl + "/99999", HttpMethod.DELETE, null, Object.class);
 		assertEquals(HttpStatus.NOT_FOUND, deleteResponse.getStatusCode());
 	}
+
+
+	@Test
+	void testProcessingAlreadyProcessedItems() {
+		//create test items that are already processed
+		IntStream.rangeClosed(1, 3).forEach(i -> {
+			Item item = new Item();
+			item.setName("Processed Item " + i);
+			item.setDescription("Already processed");
+			item.setStatus("PROCESSED");
+			item.setEmail("processed" + i + "@example.com");
+			itemRepository.save(item);
+		});
+
+		String processUrl = baseUrl + "/process";
+		ResponseEntity<Item[]> processResponse = restTemplate.getForEntity(
+				processUrl, Item[].class);
+
+		assertEquals(HttpStatus.OK, processResponse.getStatusCode());
+		Item[] processedItems = processResponse.getBody();
+		assertNotNull(processedItems);
+		assertEquals(3, processedItems.length);
+
+		//verify all items still have status PROCESSED
+		for (Item item : processedItems) {
+			assertEquals("PROCESSED", item.getStatus());
+		}
+	}
+	//ests the edge case of processing when there are no items
+	@Test
+	void testProcessingNoItems() {
+
+		itemRepository.deleteAll();
+
+		// Process items
+		String processUrl = baseUrl + "/process";
+		ResponseEntity<Item[]> processResponse = restTemplate.getForEntity(
+				processUrl, Item[].class);
+
+		assertEquals(HttpStatus.OK, processResponse.getStatusCode());
+		Item[] processedItems = processResponse.getBody();
+		assertNotNull(processedItems);
+		assertEquals(0, processedItems.length);
+	}
 }
