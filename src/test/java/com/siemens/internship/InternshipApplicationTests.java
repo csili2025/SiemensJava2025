@@ -31,6 +31,9 @@ class InternshipApplicationTests {
 	@Autowired
 	private ItemRepository itemRepository;
 
+
+	
+
 	private String baseUrl;
 
 	@BeforeEach
