@@ -39,6 +39,9 @@ class InternshipApplicationTests {
 		itemRepository.deleteAll();
 	}
 
+
+
+	
 	//this basic test ensures that Spring can initialize the application.
 	@Test
 	void contextLoads() {
